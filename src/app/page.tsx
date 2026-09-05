@@ -5,36 +5,24 @@ import { ChatRoom } from "@/components/ChatRoom";
 import { Notepad } from "@/components/Notepad";
 import { PasscodeModal } from "@/components/PasscodeModal";
 import { supabase } from "@/lib/supabase";
-import type { Message, MessageAttachment } from "@/types/message";
+import type { Message } from "@/types/message";
 
 const PASSCODES = { "1234": "user_1", "4321": "user_2" } as const;
 const DEFAULT_NOTE =
-  "Daftar Belanjaan:\n1. Beras 5kg\n2. Minyak goreng\n3. Telur ayam";
-
-function getSavedUser() {
-  if (typeof window === "undefined") return "";
-  if (sessionStorage.getItem("stealth_auth") !== "true") return "";
-  return sessionStorage.getItem("stealth_user") ?? "";
-}
-
-function getSavedNote() {
-  if (typeof window === "undefined") return DEFAULT_NOTE;
-  return localStorage.getItem("stealth_note") ?? DEFAULT_NOTE;
-}
+  "Daftar Website/Platform Web Dev:\n1. GitHub\n2. GitLab\n3. Vercel\n4. Netlify\n5. Cloudflare\n6. CodePen\n7. StackBlitz\n8. JSFiddle\n9. MDN Web Docs\n10. freeCodeCamp\n11. shadcn/ui\n12. Tailwind CSS\n13. Bootstrap\n14. Lucide\n15. Google Fonts\n16. Unsplash\n17. Postman\n18. Docker\n19. npm\n20. Can I Use";
 
 export default function Home() {
-  const [currentUserId, setCurrentUserId] = useState(getSavedUser);
-  const [isChatMode, setIsChatMode] = useState(Boolean(currentUserId));
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [isChatMode, setIsChatMode] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcode, setPasscode] = useState("");
-  const [noteText, setNoteText] = useState(getSavedNote);
+  const [noteText, setNoteText] = useState(DEFAULT_NOTE);
   const [isNoteSaved, setIsNoteSaved] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isPartnerOnline, setIsPartnerOnline] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [attachment, setAttachment] = useState<MessageAttachment | null>(null);
   const [isSending, setIsSending] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +33,23 @@ export default function Home() {
     setShowPasscodeModal(false);
     setCurrentUserId("");
   };
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      if (sessionStorage.getItem("stealth_auth") === "true") {
+        const savedUser = sessionStorage.getItem("stealth_user") ?? "";
+        if (savedUser) {
+          setCurrentUserId(savedUser);
+          setIsChatMode(true);
+        }
+      }
+
+      const savedNote = localStorage.getItem("stealth_note");
+      if (savedNote !== null) setNoteText(savedNote);
+    }, 0);
+
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -153,62 +158,23 @@ export default function Home() {
   const sendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const content = newMessage.trim();
-    if (!content && !attachment) return;
+    if (!content) return;
     setIsSending(true);
     setChatError("");
     setNewMessage("");
-    let mediaUrl: string | null = null;
-    let mediaType: string | null = null;
 
-    if (attachment) {
-      const filePath = `${currentUserId}/${crypto.randomUUID()}-${attachment.file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("message-media")
-        .upload(filePath, attachment.file, { upsert: false });
-      if (uploadError) {
-        setChatError("Lampiran tidak dapat diunggah.");
-        setNewMessage(content);
-        setIsSending(false);
-        return;
-      }
-      const { data } = supabase.storage
-        .from("message-media")
-        .getPublicUrl(filePath);
-      mediaUrl = data.publicUrl;
-      mediaType = attachment.file.type;
-    }
-
-    const { error } = await supabase
-      .from("messages")
-      .insert([
-        {
-          sender_id: currentUserId,
-          content: content || null,
-          media_url: mediaUrl,
-          media_type: mediaType,
-        },
-      ]);
+    const { error } = await supabase.from("messages").insert([
+      {
+        sender_id: currentUserId,
+        content,
+      },
+    ]);
     if (error) {
       console.error("Gagal mengirim pesan:", error);
       setChatError("Pesan tidak dapat dikirim.");
       setNewMessage(content);
     }
-    setAttachment(null);
     setIsSending(false);
-  };
-
-  const handleAttachmentChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setChatError("Ukuran lampiran maksimal 10 MB.");
-      return;
-    }
-    setChatError("");
-    setAttachment({ file, previewUrl: URL.createObjectURL(file) });
-    event.target.value = "";
   };
 
   return (
@@ -221,13 +187,10 @@ export default function Home() {
           isPartnerOnline={isPartnerOnline}
           isLoading={isLoadingMessages}
           errorMessage={chatError}
-          attachment={attachment}
           isSending={isSending}
           chatBottomRef={chatBottomRef}
           onNewMessageChange={setNewMessage}
           onSendMessage={sendMessage}
-          onAttachmentChange={handleAttachmentChange}
-          onRemoveAttachment={() => setAttachment(null)}
           onExit={exitChatMode}
         />
       ) : (
@@ -235,6 +198,7 @@ export default function Home() {
           value={noteText}
           onChange={handleNoteChange}
           isSaved={isNoteSaved}
+          onUnlockRequest={() => setShowPasscodeModal(true)}
         />
       )}
       {showPasscodeModal && (

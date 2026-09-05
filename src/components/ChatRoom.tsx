@@ -1,6 +1,9 @@
 import { format } from "date-fns";
 import Image from "next/image";
-import type { Message, MessageAttachment } from "@/types/message";
+import type { Message } from "@/types/message";
+
+const FILE_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSca0T6Q4sseRNY68H2GvbxR0epODNaSLej71iC4cQwPrsczrw/viewform?usp=dialog";
 
 interface ChatRoomProps {
   currentUserId: string;
@@ -9,13 +12,10 @@ interface ChatRoomProps {
   isPartnerOnline: boolean;
   isLoading: boolean;
   errorMessage: string;
-  attachment: MessageAttachment | null;
   isSending: boolean;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   onNewMessageChange: (value: string) => void;
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
-  onAttachmentChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveAttachment: () => void;
   onExit: () => void;
 }
 
@@ -26,13 +26,10 @@ export function ChatRoom({
   isPartnerOnline,
   isLoading,
   errorMessage,
-  attachment,
   isSending,
   chatBottomRef,
   onNewMessageChange,
   onSendMessage,
-  onAttachmentChange,
-  onRemoveAttachment,
   onExit,
 }: ChatRoomProps) {
   return (
@@ -79,26 +76,28 @@ export function ChatRoom({
                   <p className="whitespace-pre-wrap break-words">
                     {message.content}
                   </p>
-                  {message.media_url && message.media_type?.startsWith("image/") && (
-                    <Image
-                      src={message.media_url}
-                      alt="Lampiran pesan"
-                      width={640}
-                      height={480}
-                      unoptimized
-                      className="mt-2 max-h-64 max-w-full rounded object-contain"
-                    />
-                  )}
-                  {message.media_url && !message.media_type?.startsWith("image/") && (
-                    <a
-                      href={message.media_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 block text-xs text-sky-300 underline"
-                    >
-                      Buka lampiran
-                    </a>
-                  )}
+                  {message.media_url &&
+                    message.media_type?.startsWith("image/") && (
+                      <Image
+                        src={message.media_url}
+                        alt="Lampiran pesan"
+                        width={640}
+                        height={480}
+                        unoptimized
+                        className="mt-2 max-h-64 max-w-full rounded object-contain"
+                      />
+                    )}
+                  {message.media_url &&
+                    !message.media_type?.startsWith("image/") && (
+                      <a
+                        href={message.media_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 block text-xs text-sky-300 underline"
+                      >
+                        Buka lampiran
+                      </a>
+                    )}
                 </div>
                 <span className="text-[10px] text-neutral-500 mt-1 px-1">
                   {format(new Date(message.created_at), "HH:mm")}
@@ -115,14 +114,6 @@ export function ChatRoom({
           {errorMessage}
         </p>
       )}
-      {attachment && (
-        <div className="flex items-center justify-between text-xs text-neutral-400 pb-2">
-          <span className="truncate">Lampiran: {attachment.file.name}</span>
-          <button type="button" onClick={onRemoveAttachment} className="text-red-400">
-            Hapus
-          </button>
-        </div>
-      )}
       <form
         onSubmit={onSendMessage}
         className="flex gap-2 pt-2 border-t border-neutral-800 shrink-0"
@@ -135,11 +126,19 @@ export function ChatRoom({
           aria-label="Pesan baru"
           className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500"
         />
-        <label className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded text-sm cursor-pointer">
+        <a
+          href={FILE_FORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded text-sm cursor-pointer"
+        >
           File
-          <input type="file" onChange={onAttachmentChange} className="sr-only" accept="image/*,.pdf,.txt" />
-        </label>
-        <button type="submit" disabled={isSending} className="px-4 py-2 bg-neutral-200 text-neutral-900 font-semibold rounded text-sm hover:bg-white disabled:opacity-50">
+        </a>
+        <button
+          type="submit"
+          disabled={isSending}
+          className="px-4 py-2 bg-neutral-200 text-neutral-900 font-semibold rounded text-sm hover:bg-white disabled:opacity-50"
+        >
           {isSending ? "Mengirim..." : "Kirim"}
         </button>
       </form>
