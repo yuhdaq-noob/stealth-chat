@@ -21,7 +21,7 @@ interface NotepadProps {
   onUnlockRequest: () => void;
 }
 
-const UNLOCK_TRIGGER = "kangen.kevin";
+const UNLOCK_TRIGGER = "kangen.kepin";
 
 export function Notepad({
   value,
@@ -117,8 +117,8 @@ export function Notepad({
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="notepad-shell min-h-screen text-slate-800">
+      <header className="notepad-header border-b bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -238,7 +238,7 @@ export function Notepad({
               </button>
             </div>
           )}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="notepad-page overflow-hidden rounded-xl border bg-white">
             <textarea
               ref={editorRef}
               value={value}

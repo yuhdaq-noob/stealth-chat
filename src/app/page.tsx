@@ -4,18 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { ChatRoom } from "@/components/ChatRoom";
 import { Notepad } from "@/components/Notepad";
 import { PasscodeModal } from "@/components/PasscodeModal";
-import { supabase } from "@/lib/supabase";
 import type { Message } from "@/types/message";
 
-const PASSCODES = { "1234": "user_1", "4321": "user_2" } as const;
 const DEFAULT_NOTE =
   "Daftar Website/Platform Web Dev:\n1. GitHub\n2. GitLab\n3. Vercel\n4. Netlify\n5. Cloudflare\n6. CodePen\n7. StackBlitz\n8. JSFiddle\n9. MDN Web Docs\n10. freeCodeCamp\n11. shadcn/ui\n12. Tailwind CSS\n13. Bootstrap\n14. Lucide\n15. Google Fonts\n16. Unsplash\n17. Postman\n18. Docker\n19. npm\n20. Can I Use";
 
 export default function Home() {
   const [currentUserId, setCurrentUserId] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
   const [isChatMode, setIsChatMode] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
-  const [passcode, setPasscode] = useState("");
+  const [passcodeName, setPasscodeName] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [noteText, setNoteText] = useState(DEFAULT_NOTE);
   const [isNoteSaved, setIsNoteSaved] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,31 +27,32 @@ export default function Home() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [chatError, setChatError] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  const exitChatMode = () => {
-    sessionStorage.removeItem("stealth_auth");
-    sessionStorage.removeItem("stealth_user");
+  const exitChatMode = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     setIsChatMode(false);
     setShowPasscodeModal(false);
     setCurrentUserId("");
+    setCurrentUserName("");
   };
 
   useEffect(() => {
-    const restoreTimer = window.setTimeout(() => {
-      if (sessionStorage.getItem("stealth_auth") === "true") {
-        const savedUser = sessionStorage.getItem("stealth_user") ?? "";
-        if (savedUser) {
-          setCurrentUserId(savedUser);
-          setIsChatMode(true);
-        }
+    const restoreSession = async () => {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const { user } = await response.json();
+        setCurrentUserId(user.id);
+        setCurrentUserName(user.displayName);
+        setIsChatMode(true);
       }
-
       const savedNote = localStorage.getItem("stealth_note");
       if (savedNote !== null) setNoteText(savedNote);
-    }, 0);
+      setIsAuthLoading(false);
+    };
 
-    return () => window.clearTimeout(restoreTimer);
+    void restoreSession();
   }, []);
 
   useEffect(() => {
@@ -85,74 +89,63 @@ export default function Home() {
 
   useEffect(() => {
     if (!isChatMode || !currentUserId) return;
-    const partnerId = currentUserId === "user_1" ? "user_2" : "user_1";
+    let isActive = true;
 
-    const fetchMessages = async () => {
-      setIsLoadingMessages(true);
+    const fetchMessages = async (showLoading = false) => {
+      if (showLoading) setIsLoadingMessages(true);
       setChatError("");
-      const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .order("created_at", { ascending: true });
-      if (error) setChatError("Pesan tidak dapat dimuat.");
-      else if (data) setMessages(data);
-      setIsLoadingMessages(false);
+      const response = await fetch("/api/messages");
+      if (!isActive) return;
+      if (!response.ok) setChatError("Pesan tidak dapat dimuat.");
+      else setMessages((await response.json()).messages ?? []);
+      if (showLoading) setIsLoadingMessages(false);
     };
-    fetchMessages();
-
-    const messageChannel = supabase
-      .channel("realtime_messages")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const incomingMessage = payload.new as Message;
-          setMessages((currentMessages) =>
-            currentMessages.some((message) => message.id === incomingMessage.id)
-              ? currentMessages
-              : [...currentMessages, incomingMessage],
-          );
-        },
-      )
-      .subscribe();
-
-    const presenceChannel = supabase.channel("online_presence", {
-      config: { presence: { key: currentUserId } },
-    });
-    presenceChannel
-      .on("presence", { event: "sync" }, () => {
-        setIsPartnerOnline(
-          Object.keys(presenceChannel.presenceState()).includes(partnerId),
-        );
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED")
-          await presenceChannel.track({ online_at: new Date().toISOString() });
-      });
+    const fetchPresence = async () => {
+      const response = await fetch("/api/presence");
+      if (isActive && response.ok)
+        setIsPartnerOnline((await response.json()).isPartnerOnline);
+    };
+    void fetchMessages(true);
+    void fetchPresence();
+    const messageTimer = window.setInterval(() => {
+      void fetchMessages();
+    }, 5000);
+    const presenceTimer = window.setInterval(async () => {
+      await fetch("/api/presence/heartbeat", { method: "POST" });
+      await fetchPresence();
+    }, 15000);
 
     return () => {
-      supabase.removeChannel(messageChannel);
-      supabase.removeChannel(presenceChannel);
+      isActive = false;
+      window.clearInterval(messageTimer);
+      window.clearInterval(presenceTimer);
       setMessages([]);
       setIsPartnerOnline(false);
       setIsLoadingMessages(false);
     };
-  }, [currentUserId, isChatMode]);
+  }, [currentUserId, isChatMode, messageRefreshKey]);
 
-  const handleUnlock = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleUnlock = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const assignedUser = PASSCODES[passcode as keyof typeof PASSCODES];
-    if (!assignedUser) {
-      alert("Passcode salah");
-      setPasscode("");
+    setIsAuthenticating(true);
+    setAuthError("");
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: passcodeName, password }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setAuthError(result.error ?? "Login tidak berhasil.");
+      setIsAuthenticating(false);
       return;
     }
-    sessionStorage.setItem("stealth_auth", "true");
-    sessionStorage.setItem("stealth_user", assignedUser);
-    setCurrentUserId(assignedUser);
+    setCurrentUserId(result.user.id);
+    setCurrentUserName(result.user.displayName);
     setIsChatMode(true);
     setShowPasscodeModal(false);
-    setPasscode("");
+    setPassword("");
+    setIsAuthenticating(false);
   };
 
   const sendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -163,25 +156,26 @@ export default function Home() {
     setChatError("");
     setNewMessage("");
 
-    const { error } = await supabase.from("messages").insert([
-      {
-        sender_id: currentUserId,
-        content,
-      },
-    ]);
-    if (error) {
-      console.error("Gagal mengirim pesan:", error);
+    const response = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) {
       setChatError("Pesan tidak dapat dikirim.");
       setNewMessage(content);
     }
     setIsSending(false);
   };
 
+  if (isAuthLoading) return null;
+
   return (
-    <main className="min-h-screen bg-neutral-900 text-neutral-100 font-mono">
+    <main className="min-h-screen text-neutral-100">
       {isChatMode ? (
         <ChatRoom
           currentUserId={currentUserId}
+          currentUserName={currentUserName}
           messages={messages}
           newMessage={newMessage}
           isPartnerOnline={isPartnerOnline}
@@ -191,6 +185,7 @@ export default function Home() {
           chatBottomRef={chatBottomRef}
           onNewMessageChange={setNewMessage}
           onSendMessage={sendMessage}
+          onRetryLoad={() => setMessageRefreshKey((key) => key + 1)}
           onExit={exitChatMode}
         />
       ) : (
@@ -203,8 +198,12 @@ export default function Home() {
       )}
       {showPasscodeModal && (
         <PasscodeModal
-          value={passcode}
-          onChange={setPasscode}
+          name={passcodeName}
+          password={password}
+          errorMessage={authError}
+          isSubmitting={isAuthenticating}
+          onNameChange={setPasscodeName}
+          onPasswordChange={setPassword}
           onSubmit={handleUnlock}
           onCancel={() => setShowPasscodeModal(false)}
         />

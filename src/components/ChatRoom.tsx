@@ -1,5 +1,16 @@
+"use client";
+
 import { format } from "date-fns";
 import Image from "next/image";
+import {
+  Check,
+  FileUp,
+  LogOut,
+  RefreshCw,
+  Send,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import type { Message } from "@/types/message";
 
 const FILE_FORM_URL =
@@ -7,6 +18,7 @@ const FILE_FORM_URL =
 
 interface ChatRoomProps {
   currentUserId: string;
+  currentUserName: string;
   messages: Message[];
   newMessage: string;
   isPartnerOnline: boolean;
@@ -16,11 +28,13 @@ interface ChatRoomProps {
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   onNewMessageChange: (value: string) => void;
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
+  onRetryLoad: () => void;
   onExit: () => void;
 }
 
 export function ChatRoom({
   currentUserId,
+  currentUserName,
   messages,
   newMessage,
   isPartnerOnline,
@@ -30,52 +44,70 @@ export function ChatRoom({
   chatBottomRef,
   onNewMessageChange,
   onSendMessage,
+  onRetryLoad,
   onExit,
 }: ChatRoomProps) {
+  const remainingCharacters = 2000 - newMessage.length;
+
   return (
-    <div className="p-4 max-w-2xl mx-auto flex flex-col h-screen">
-      <div className="flex justify-between items-center border-b border-neutral-800 pb-3 mb-2 shrink-0">
-        <div>
-          <h1 className="font-bold text-sm text-neutral-200">
-            Private Room ({currentUserId === "user_1" ? "User A" : "User B"})
-          </h1>
-          <span
-            className={`text-xs ${isPartnerOnline ? "text-emerald-400" : "text-neutral-500"}`}
-          >
-            {isPartnerOnline ? "● Partner Online" : "● Partner Offline"}
-          </span>
+    <div className="chat-shell">
+      <header className="chat-header">
+        <div className="chat-identity">
+          <div>
+            <p className="eyebrow">Jual Beli Musang</p>
+            <h1>{currentUserName}</h1>
+            <p className={`presence ${isPartnerOnline ? "is-online" : ""}`}>
+              {isPartnerOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
+              {isPartnerOnline ? "Partner online" : "Partner offline"}
+            </p>
+          </div>
         </div>
         <button
           onClick={onExit}
-          className="px-3 py-1 bg-red-600/20 text-red-400 border border-red-500/30 text-xs rounded hover:bg-red-600/30"
+          className="button button-quiet button-danger"
+          type="button"
         >
-          Exit (Esc)
+          <LogOut size={15} />
+          <span>Exit</span>
         </button>
+      </header>
+
+      <div className="chat-statusbar">
+        <span>
+          {messages.length} {messages.length === 1 ? "message" : "messages"}
+        </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 p-2 my-2">
+      <div className="chat-messages">
         {isLoading ? (
-          <div className="text-center text-xs text-neutral-500 my-10">
-            Memuat pesan...
+          <div className="chat-empty-state">
+            <RefreshCw size={18} className="animate-spin" />
+            <p>Loading room...</p>
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-xs text-neutral-600 my-10">
-            Belum ada pesan.
+          <div className="chat-empty-state">
+            <div className="empty-icon">
+              <Send size={18} />
+            </div>
+            <p>No messages yet</p>
+            <span>Start a quiet conversation with your seller or buyer.</span>
           </div>
         ) : (
           messages.map((message) => {
             const isCurrentUser = message.sender_id === currentUserId;
             return (
-              <div
+              <article
                 key={message.id}
-                className={`flex flex-col ${isCurrentUser ? "items-end" : "items-start"}`}
+                className={`message-row ${isCurrentUser ? "is-mine" : ""}`}
               >
-                <div
-                  className={`max-w-[80%] px-3 py-2 rounded text-sm ${isCurrentUser ? "bg-neutral-700 text-neutral-100 rounded-br-none" : "bg-neutral-800 text-neutral-200 border border-neutral-700 rounded-bl-none"}`}
-                >
-                  <p className="whitespace-pre-wrap break-words">
-                    {message.content}
-                  </p>
+                <div className="message-meta">
+                  <span>{isCurrentUser ? "You" : "Partner"}</span>
+                  <time dateTime={message.created_at}>
+                    {format(new Date(message.created_at), "HH:mm")}
+                  </time>
+                </div>
+                <div className="message-bubble">
+                  <p className="message-content">{message.content}</p>
                   {message.media_url &&
                     message.media_type?.startsWith("image/") && (
                       <Image
@@ -84,7 +116,7 @@ export function ChatRoom({
                         width={640}
                         height={480}
                         unoptimized
-                        className="mt-2 max-h-64 max-w-full rounded object-contain"
+                        className="message-image"
                       />
                     )}
                   {message.media_url &&
@@ -93,16 +125,16 @@ export function ChatRoom({
                         href={message.media_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-2 block text-xs text-sky-300 underline"
+                        className="message-attachment"
                       >
                         Buka lampiran
                       </a>
                     )}
+                  <div className="message-actions">
+                    {isCurrentUser && <Check size={13} aria-label="Sent" />}
+                  </div>
                 </div>
-                <span className="text-[10px] text-neutral-500 mt-1 px-1">
-                  {format(new Date(message.created_at), "HH:mm")}
-                </span>
-              </div>
+              </article>
             );
           })
         )}
@@ -110,37 +142,46 @@ export function ChatRoom({
       </div>
 
       {errorMessage && (
-        <p className="text-xs text-red-400 pb-2" role="alert">
-          {errorMessage}
-        </p>
+        <div className="chat-error" role="alert">
+          <span>{errorMessage}</span>
+          <button type="button" onClick={onRetryLoad}>
+            <RefreshCw size={13} /> Retry
+          </button>
+        </div>
       )}
-      <form
-        onSubmit={onSendMessage}
-        className="flex gap-2 pt-2 border-t border-neutral-800 shrink-0"
-      >
+      <form onSubmit={onSendMessage} className="composer">
         <input
           type="text"
           value={newMessage}
           onChange={(event) => onNewMessageChange(event.target.value)}
-          placeholder="Tulis pesan..."
+          placeholder="Write a message..."
           aria-label="Pesan baru"
-          className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500"
+          maxLength={2000}
+          disabled={isSending}
         />
         <a
           href={FILE_FORM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded text-sm cursor-pointer"
+          className="button button-secondary"
+          title="Open the file sharing form"
         >
-          File
+          <FileUp size={16} />
+          <span>File</span>
         </a>
         <button
           type="submit"
-          disabled={isSending}
-          className="px-4 py-2 bg-neutral-200 text-neutral-900 font-semibold rounded text-sm hover:bg-white disabled:opacity-50"
+          disabled={isSending || !newMessage.trim()}
+          className="button button-primary"
         >
-          {isSending ? "Mengirim..." : "Kirim"}
+          <Send size={16} />
+          <span>{isSending ? "Sending" : "Send"}</span>
         </button>
+        <span
+          className={`composer-count ${remainingCharacters < 100 ? "is-low" : ""}`}
+        >
+          {remainingCharacters}
+        </span>
       </form>
     </div>
   );
