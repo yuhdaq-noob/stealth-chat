@@ -5,6 +5,7 @@ export interface Message {
   media_url: string | null;
   media_type: string | null;
   created_at: string;
+  read_at: string | null;
 }
 
 export interface MessageAttachment {

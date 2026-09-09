@@ -27,6 +27,9 @@ export default function Home() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [chatError, setChatError] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +123,7 @@ export default function Home() {
       window.clearInterval(messageTimer);
       window.clearInterval(presenceTimer);
       setMessages([]);
+      setSelectedMessageIds([]);
       setIsPartnerOnline(false);
       setIsLoadingMessages(false);
     };
@@ -153,6 +157,7 @@ export default function Home() {
     const content = newMessage.trim();
     if (!content) return;
     setIsSending(true);
+    setPendingMessage(content);
     setChatError("");
     setNewMessage("");
 
@@ -164,8 +169,41 @@ export default function Home() {
     if (!response.ok) {
       setChatError("Pesan tidak dapat dikirim.");
       setNewMessage(content);
+    } else {
+      const result = await response.json();
+      if (result.message)
+        setMessages((current) => [...current, result.message]);
     }
+    setPendingMessage("");
     setIsSending(false);
+  };
+
+  const deleteMessages = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const confirmed = window.confirm(
+      `Hapus ${ids.length} ${ids.length === 1 ? "pesan" : "pesan yang dipilih"}?`,
+    );
+    if (!confirmed) return;
+    setIsDeleting(true);
+    setChatError("");
+    const response = await fetch("/api/messages", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      setChatError(result?.error ?? "Pesan tidak dapat dihapus.");
+    } else {
+      const deletedIds = new Set<string>(result?.deletedIds ?? []);
+      setMessages((current) =>
+        current.filter((message) => !deletedIds.has(message.id)),
+      );
+      setSelectedMessageIds((current) =>
+        current.filter((id) => !deletedIds.has(id)),
+      );
+    }
+    setIsDeleting(false);
   };
 
   if (isAuthLoading) return null;
@@ -182,10 +220,15 @@ export default function Home() {
           isLoading={isLoadingMessages}
           errorMessage={chatError}
           isSending={isSending}
+          pendingMessage={pendingMessage}
+          selectedMessageIds={selectedMessageIds}
+          isDeleting={isDeleting}
           chatBottomRef={chatBottomRef}
           onNewMessageChange={setNewMessage}
           onSendMessage={sendMessage}
           onRetryLoad={() => setMessageRefreshKey((key) => key + 1)}
+          onSelectionChange={setSelectedMessageIds}
+          onDeleteMessages={deleteMessages}
           onExit={exitChatMode}
         />
       ) : (

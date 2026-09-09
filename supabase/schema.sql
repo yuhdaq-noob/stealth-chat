@@ -19,6 +19,9 @@ create index if not exists auth_sessions_expires_at_idx on public.auth_sessions(
 alter table public.messages
   alter column sender_id type text using sender_id::text;
 
+alter table public.messages
+  add column if not exists read_at timestamptz;
+
 alter table public.messages enable row level security;
 alter table public.app_users enable row level security;
 alter table public.auth_sessions enable row level security;

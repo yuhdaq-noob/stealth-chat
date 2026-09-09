@@ -4,12 +4,17 @@ import { format } from "date-fns";
 import Image from "next/image";
 import {
   Check,
+  CheckCheck,
+  Clock3,
   FileUp,
+  ListChecks,
   LogOut,
   RefreshCw,
   Send,
+  Trash2,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import type { Message } from "@/types/message";
 
@@ -25,10 +30,15 @@ interface ChatRoomProps {
   isLoading: boolean;
   errorMessage: string;
   isSending: boolean;
+  pendingMessage: string;
+  selectedMessageIds: string[];
+  isDeleting: boolean;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   onNewMessageChange: (value: string) => void;
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
   onRetryLoad: () => void;
+  onSelectionChange: (ids: string[]) => void;
+  onDeleteMessages: (ids: string[]) => void;
   onExit: () => void;
 }
 
@@ -41,13 +51,36 @@ export function ChatRoom({
   isLoading,
   errorMessage,
   isSending,
+  pendingMessage,
+  selectedMessageIds,
+  isDeleting,
   chatBottomRef,
   onNewMessageChange,
   onSendMessage,
   onRetryLoad,
+  onSelectionChange,
+  onDeleteMessages,
   onExit,
 }: ChatRoomProps) {
   const remainingCharacters = 2000 - newMessage.length;
+  const ownMessageIds = messages
+    .filter((message) => message.sender_id === currentUserId)
+    .map((message) => message.id);
+  const allOwnMessagesSelected =
+    ownMessageIds.length > 0 &&
+    ownMessageIds.every((id) => selectedMessageIds.includes(id));
+
+  const toggleMessageSelection = (id: string) => {
+    onSelectionChange(
+      selectedMessageIds.includes(id)
+        ? selectedMessageIds.filter((selectedId) => selectedId !== id)
+        : [...selectedMessageIds, id],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    onSelectionChange(allOwnMessagesSelected ? [] : ownMessageIds);
+  };
 
   return (
     <div className="chat-shell">
@@ -76,6 +109,43 @@ export function ChatRoom({
         <span>
           {messages.length} {messages.length === 1 ? "message" : "messages"}
         </span>
+        {ownMessageIds.length > 0 && (
+          <div className="message-selection-actions">
+            {selectedMessageIds.length > 0 ? (
+              <>
+                <span>{selectedMessageIds.length} dipilih</span>
+                <button
+                  type="button"
+                  className="selection-action selection-delete"
+                  onClick={() => onDeleteMessages(selectedMessageIds)}
+                  disabled={isDeleting}
+                >
+                  <Trash2 size={13} />
+                  <span>{isDeleting ? "Menghapus..." : "Hapus"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="selection-action"
+                  onClick={() => onSelectionChange([])}
+                  disabled={isDeleting}
+                  aria-label="Batalkan pilihan"
+                >
+                  <X size={14} />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="selection-action"
+                onClick={toggleSelectAll}
+                title="Pilih semua pesan saya"
+              >
+                <ListChecks size={14} />
+                Pilih semua pesan saya
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="chat-messages">
@@ -98,7 +168,7 @@ export function ChatRoom({
             return (
               <article
                 key={message.id}
-                className={`message-row ${isCurrentUser ? "is-mine" : ""}`}
+                className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
               >
                 <div className="message-meta">
                   <span>{isCurrentUser ? "You" : "Partner"}</span>
@@ -107,6 +177,17 @@ export function ChatRoom({
                   </time>
                 </div>
                 <div className="message-bubble">
+                  {isCurrentUser && (
+                    <label className="message-select">
+                      <input
+                        type="checkbox"
+                        checked={selectedMessageIds.includes(message.id)}
+                        onChange={() => toggleMessageSelection(message.id)}
+                        aria-label="Pilih pesan"
+                      />
+                      <span />
+                    </label>
+                  )}
                   <p className="message-content">{message.content}</p>
                   {message.media_url &&
                     message.media_type?.startsWith("image/") && (
@@ -131,12 +212,43 @@ export function ChatRoom({
                       </a>
                     )}
                   <div className="message-actions">
-                    {isCurrentUser && <Check size={13} aria-label="Sent" />}
+                    {isCurrentUser &&
+                      (message.read_at ? (
+                        <CheckCheck
+                          size={15}
+                          className="message-status is-read"
+                          aria-label="Sudah terbaca"
+                        />
+                      ) : (
+                        <Check
+                          size={15}
+                          className="message-status"
+                          aria-label="Terkirim"
+                        />
+                      ))}
                   </div>
                 </div>
               </article>
             );
           })
+        )}
+        {pendingMessage && (
+          <article className="message-row is-mine is-pending">
+            <div className="message-meta">
+              <span>You</span>
+              <span>Mengirim...</span>
+            </div>
+            <div className="message-bubble">
+              <p className="message-content">{pendingMessage}</p>
+              <div className="message-actions">
+                <Clock3
+                  size={15}
+                  className="message-status is-pending"
+                  aria-label="Belum terkirim"
+                />
+              </div>
+            </div>
+          </article>
         )}
         <div ref={chatBottomRef} />
       </div>
@@ -150,14 +262,14 @@ export function ChatRoom({
         </div>
       )}
       <form onSubmit={onSendMessage} className="composer">
-        <input
-          type="text"
+        <textarea
           value={newMessage}
           onChange={(event) => onNewMessageChange(event.target.value)}
-          placeholder="Write a message..."
+          placeholder="Tulis pesan..."
           aria-label="Pesan baru"
           maxLength={2000}
           disabled={isSending}
+          rows={1}
         />
         <a
           href={FILE_FORM_URL}
