@@ -2,6 +2,7 @@
 
 import { format } from "date-fns";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -9,6 +10,7 @@ import {
   FileUp,
   ListChecks,
   LogOut,
+  MoreVertical,
   RefreshCw,
   Send,
   Trash2,
@@ -38,7 +40,7 @@ interface ChatRoomProps {
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
   onRetryLoad: () => void;
   onSelectionChange: (ids: string[]) => void;
-  onDeleteMessages: (ids: string[]) => void;
+  onDeleteMessages: (ids: string[]) => boolean | Promise<boolean>;
   onExit: () => void;
 }
 
@@ -62,6 +64,10 @@ export function ChatRoom({
   onDeleteMessages,
   onExit,
 }: ChatRoomProps) {
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const longPressTimerRef = useRef<number | null>(null);
   const remainingCharacters = 2000 - newMessage.length;
   const ownMessageIds = messages
     .filter((message) => message.sender_id === currentUserId)
@@ -71,7 +77,7 @@ export function ChatRoom({
     ownMessageIds.every((id) => selectedMessageIds.includes(id));
 
   const toggleMessageSelection = (id: string) => {
-    onSelectionChange(
+    handleSelectionChange(
       selectedMessageIds.includes(id)
         ? selectedMessageIds.filter((selectedId) => selectedId !== id)
         : [...selectedMessageIds, id],
@@ -79,7 +85,46 @@ export function ChatRoom({
   };
 
   const toggleSelectAll = () => {
-    onSelectionChange(allOwnMessagesSelected ? [] : ownMessageIds);
+    handleSelectionChange(allOwnMessagesSelected ? [] : ownMessageIds);
+  };
+
+  useEffect(() => {
+    if (!shouldAutoScrollRef.current) return;
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, pendingMessage, chatBottomRef]);
+
+  const handleMessagesScroll = () => {
+    const container = chatMessagesRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 96;
+  };
+
+  const activateSelection = (id?: string) => {
+    setIsSelectionMode(true);
+    if (id && !selectedMessageIds.includes(id)) {
+      onSelectionChange([...selectedMessageIds, id]);
+    }
+  };
+
+  const handleSelectionChange = (ids: string[]) => {
+    onSelectionChange(ids);
+    if (ids.length === 0) setIsSelectionMode(false);
+  };
+
+  const startLongPress = (id: string) => {
+    longPressTimerRef.current = window.setTimeout(() => {
+      activateSelection(id);
+      longPressTimerRef.current = null;
+    }, 550);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   };
 
   return (
@@ -117,7 +162,10 @@ export function ChatRoom({
                 <button
                   type="button"
                   className="selection-action selection-delete"
-                  onClick={() => onDeleteMessages(selectedMessageIds)}
+                  onClick={async () => {
+                    const deleted = await onDeleteMessages(selectedMessageIds);
+                    if (deleted) setIsSelectionMode(false);
+                  }}
                   disabled={isDeleting}
                 >
                   <Trash2 size={13} />
@@ -126,7 +174,7 @@ export function ChatRoom({
                 <button
                   type="button"
                   className="selection-action"
-                  onClick={() => onSelectionChange([])}
+                  onClick={() => handleSelectionChange([])}
                   disabled={isDeleting}
                   aria-label="Batalkan pilihan"
                 >
@@ -137,7 +185,10 @@ export function ChatRoom({
               <button
                 type="button"
                 className="selection-action"
-                onClick={toggleSelectAll}
+                onClick={() => {
+                  setIsSelectionMode(true);
+                  toggleSelectAll();
+                }}
                 title="Pilih semua pesan saya"
               >
                 <ListChecks size={14} />
@@ -148,7 +199,11 @@ export function ChatRoom({
         )}
       </div>
 
-      <div className="chat-messages">
+      <div
+        ref={chatMessagesRef}
+        className="chat-messages"
+        onScroll={handleMessagesScroll}
+      >
         {isLoading ? (
           <div className="chat-empty-state">
             <RefreshCw size={18} className="animate-spin" />
@@ -169,6 +224,20 @@ export function ChatRoom({
               <article
                 key={message.id}
                 className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
+                onPointerDown={
+                  isCurrentUser ? () => startLongPress(message.id) : undefined
+                }
+                onPointerUp={cancelLongPress}
+                onPointerCancel={cancelLongPress}
+                onPointerLeave={cancelLongPress}
+                onContextMenu={
+                  isCurrentUser
+                    ? (event) => {
+                        event.preventDefault();
+                        activateSelection(message.id);
+                      }
+                    : undefined
+                }
               >
                 <div className="message-meta">
                   <span>{isCurrentUser ? "You" : "Partner"}</span>
@@ -177,7 +246,18 @@ export function ChatRoom({
                   </time>
                 </div>
                 <div className="message-bubble">
-                  {isCurrentUser && (
+                  {isCurrentUser && !isSelectionMode && (
+                    <button
+                      type="button"
+                      className="message-menu"
+                      onClick={() => activateSelection(message.id)}
+                      aria-label="Pilih pesan"
+                      title="Pilih pesan"
+                    >
+                      <MoreVertical size={15} />
+                    </button>
+                  )}
+                  {isCurrentUser && isSelectionMode && (
                     <label className="message-select">
                       <input
                         type="checkbox"

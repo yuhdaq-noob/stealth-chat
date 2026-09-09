@@ -273,6 +273,38 @@ textarea:focus-visible {
   box-shadow: 0 8px 18px #10191620;
 }
 
+.message-menu {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #e8c0ac;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    background 0.18s ease;
+}
+
+.message-bubble:hover .message-menu,
+.message-menu:focus-visible {
+  opacity: 1;
+}
+
+.message-menu:hover {
+  background: #17221f30;
+}
+
+.is-mine .message-content {
+  padding-right: 22px;
+}
+
 .message-select {
   position: absolute;
   top: 8px;
@@ -542,6 +574,10 @@ textarea:focus-visible {
 
   .message-bubble {
     max-width: 88%;
+  }
+
+  .message-menu {
+    opacity: 0.7;
   }
 
   .composer {

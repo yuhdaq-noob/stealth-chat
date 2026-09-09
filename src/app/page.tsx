@@ -35,6 +35,7 @@ export default function Home() {
 
   const exitChatMode = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    sessionStorage.removeItem("stealth_chat_active");
     setIsChatMode(false);
     setShowPasscodeModal(false);
     setCurrentUserId("");
@@ -43,8 +44,10 @@ export default function Home() {
 
   useEffect(() => {
     const restoreSession = async () => {
+      const chatSessionActive =
+        sessionStorage.getItem("stealth_chat_active") === "true";
       const response = await fetch("/api/auth/me");
-      if (response.ok) {
+      if (response.ok && chatSessionActive) {
         const { user } = await response.json();
         setCurrentUserId(user.id);
         setCurrentUserName(user.displayName);
@@ -72,10 +75,6 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   useEffect(() => {
     const saveTimer = window.setTimeout(() => {
@@ -146,6 +145,7 @@ export default function Home() {
     }
     setCurrentUserId(result.user.id);
     setCurrentUserName(result.user.displayName);
+    sessionStorage.setItem("stealth_chat_active", "true");
     setIsChatMode(true);
     setShowPasscodeModal(false);
     setPassword("");
@@ -179,11 +179,11 @@ export default function Home() {
   };
 
   const deleteMessages = async (ids: string[]) => {
-    if (ids.length === 0) return;
+    if (ids.length === 0) return false;
     const confirmed = window.confirm(
       `Hapus ${ids.length} ${ids.length === 1 ? "pesan" : "pesan yang dipilih"}?`,
     );
-    if (!confirmed) return;
+    if (!confirmed) return false;
     setIsDeleting(true);
     setChatError("");
     const response = await fetch("/api/messages", {
@@ -204,6 +204,7 @@ export default function Home() {
       );
     }
     setIsDeleting(false);
+    return response.ok;
   };
 
   if (isAuthLoading) return null;
