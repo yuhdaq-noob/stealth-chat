@@ -33,6 +33,15 @@ export default function Home() {
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  const handleSessionExpired = () => {
+    sessionStorage.removeItem("stealth_chat_active");
+    setIsChatMode(false);
+    setCurrentUserId("");
+    setCurrentUserName("");
+    setShowPasscodeModal(true);
+    setAuthError("Sesi Anda telah berakhir. Silakan masuk kembali.");
+  };
+
   const exitChatMode = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     sessionStorage.removeItem("stealth_chat_active");
@@ -52,6 +61,8 @@ export default function Home() {
         setCurrentUserId(user.id);
         setCurrentUserName(user.displayName);
         setIsChatMode(true);
+      } else if (chatSessionActive) {
+        handleSessionExpired();
       }
       const savedNote = localStorage.getItem("stealth_note");
       if (savedNote !== null) setNoteText(savedNote);
@@ -98,23 +109,45 @@ export default function Home() {
       setChatError("");
       const response = await fetch("/api/messages");
       if (!isActive) return;
+      if (response.status === 401) {
+        handleSessionExpired();
+        if (showLoading) setIsLoadingMessages(false);
+        return;
+      }
       if (!response.ok) setChatError("Pesan tidak dapat dimuat.");
       else setMessages((await response.json()).messages ?? []);
       if (showLoading) setIsLoadingMessages(false);
     };
     const fetchPresence = async () => {
       const response = await fetch("/api/presence");
-      if (isActive && response.ok)
+      if (!isActive) return false;
+      if (response.status === 401) {
+        handleSessionExpired();
+        return false;
+      }
+      if (response.ok)
         setIsPartnerOnline((await response.json()).isPartnerOnline);
+      return response.ok;
+    };
+    const sendHeartbeat = async () => {
+      const response = await fetch("/api/presence/heartbeat", {
+        method: "POST",
+      });
+      if (!isActive) return false;
+      if (response.status === 401) {
+        handleSessionExpired();
+        return false;
+      }
+      return response.ok;
     };
     void fetchMessages(true);
     void fetchPresence();
+    void sendHeartbeat();
     const messageTimer = window.setInterval(() => {
       void fetchMessages();
     }, 5000);
     const presenceTimer = window.setInterval(async () => {
-      await fetch("/api/presence/heartbeat", { method: "POST" });
-      await fetchPresence();
+      if (await sendHeartbeat()) await fetchPresence();
     }, 15000);
 
     return () => {
@@ -166,7 +199,10 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
-    if (!response.ok) {
+    if (response.status === 401) {
+      handleSessionExpired();
+      setNewMessage(content);
+    } else if (!response.ok) {
       setChatError("Pesan tidak dapat dikirim.");
       setNewMessage(content);
     } else {
@@ -192,7 +228,9 @@ export default function Home() {
       body: JSON.stringify({ ids }),
     });
     const result = await response.json().catch(() => null);
-    if (!response.ok) {
+    if (response.status === 401) {
+      handleSessionExpired();
+    } else if (!response.ok) {
       setChatError(result?.error ?? "Pesan tidak dapat dihapus.");
     } else {
       const deletedIds = new Set<string>(result?.deletedIds ?? []);

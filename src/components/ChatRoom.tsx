@@ -18,6 +18,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import { getUserAlias } from "@/lib/user-aliases";
 import type { Message } from "@/types/message";
 
 const FILE_FORM_URL =
@@ -69,6 +70,7 @@ export function ChatRoom({
   const shouldAutoScrollRef = useRef(true);
   const longPressTimerRef = useRef<number | null>(null);
   const remainingCharacters = 2000 - newMessage.length;
+  const currentUserAlias = getUserAlias(currentUserId, currentUserName);
   const ownMessageIds = messages
     .filter((message) => message.sender_id === currentUserId)
     .map((message) => message.id);
@@ -128,12 +130,12 @@ export function ChatRoom({
   };
 
   return (
-    <div className="chat-shell">
+    <div className="chat-shell" aria-label="Ruang chat">
       <header className="chat-header">
         <div className="chat-identity">
           <div>
             <p className="eyebrow">Jual Beli Musang</p>
-            <h1>{currentUserName}</h1>
+            <h1>{currentUserAlias}</h1>
             <p className={`presence ${isPartnerOnline ? "is-online" : ""}`}>
               {isPartnerOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
               {isPartnerOnline ? "Partner online" : "Partner offline"}
@@ -144,14 +146,16 @@ export function ChatRoom({
           onClick={onExit}
           className="button button-quiet button-danger"
           type="button"
+          aria-label="Exit chat"
         >
           <LogOut size={15} />
           <span>Exit</span>
         </button>
       </header>
 
-      <div className="chat-statusbar">
-        <span>
+      <div className="chat-statusbar" aria-live="polite">
+        <span className="message-total">
+          <span className="status-dot" aria-hidden="true" />
           {messages.length} {messages.length === 1 ? "message" : "messages"}
         </span>
         {ownMessageIds.length > 0 && (
@@ -240,7 +244,12 @@ export function ChatRoom({
                 }
               >
                 <div className="message-meta">
-                  <span>{isCurrentUser ? "You" : "Partner"}</span>
+                  <span>
+                    {getUserAlias(
+                      message.sender_id,
+                      isCurrentUser ? currentUserName : "Partner",
+                    )}
+                  </span>
                   <time dateTime={message.created_at}>
                     {format(new Date(message.created_at), "HH:mm")}
                   </time>
@@ -315,7 +324,7 @@ export function ChatRoom({
         {pendingMessage && (
           <article className="message-row is-mine is-pending">
             <div className="message-meta">
-              <span>You</span>
+              <span>{currentUserAlias}</span>
               <span>Mengirim...</span>
             </div>
             <div className="message-bubble">
@@ -334,7 +343,7 @@ export function ChatRoom({
       </div>
 
       {errorMessage && (
-        <div className="chat-error" role="alert">
+        <div className="chat-error" role="alert" aria-live="assertive">
           <span>{errorMessage}</span>
           <button type="button" onClick={onRetryLoad}>
             <RefreshCw size={13} /> Retry
@@ -342,21 +351,31 @@ export function ChatRoom({
         </div>
       )}
       <form onSubmit={onSendMessage} className="composer">
-        <textarea
-          value={newMessage}
-          onChange={(event) => onNewMessageChange(event.target.value)}
-          placeholder="Tulis pesan..."
-          aria-label="Pesan baru"
-          maxLength={2000}
-          disabled={isSending}
-          rows={1}
-        />
+        <div className="composer-input">
+          <textarea
+            value={newMessage}
+            onChange={(event) => onNewMessageChange(event.target.value)}
+            placeholder="Tulis pesan..."
+            aria-label="Pesan baru"
+            aria-describedby="composer-count"
+            maxLength={2000}
+            disabled={isSending}
+            rows={1}
+          />
+          <span
+            id="composer-count"
+            className={`composer-count ${remainingCharacters < 100 ? "is-low" : ""}`}
+          >
+            {remainingCharacters}
+          </span>
+        </div>
         <a
           href={FILE_FORM_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="button button-secondary"
           title="Open the file sharing form"
+          aria-label="Open the file sharing form"
         >
           <FileUp size={16} />
           <span>File</span>
@@ -365,15 +384,11 @@ export function ChatRoom({
           type="submit"
           disabled={isSending || !newMessage.trim()}
           className="button button-primary"
+          aria-label={isSending ? "Sending" : "Send"}
         >
           <Send size={16} />
           <span>{isSending ? "Sending" : "Send"}</span>
         </button>
-        <span
-          className={`composer-count ${remainingCharacters < 100 ? "is-low" : ""}`}
-        >
-          {remainingCharacters}
-        </span>
       </form>
     </div>
   );

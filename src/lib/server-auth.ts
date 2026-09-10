@@ -19,14 +19,18 @@ export async function createSession(userId: string) {
   const expiresAt = new Date(
     Date.now() + SESSION_DURATION_SECONDS * 1000,
   ).toISOString();
+  const supabase = getSupabaseAdmin();
 
-  const { error } = await getSupabaseAdmin()
+  await supabase
     .from("auth_sessions")
-    .insert({
-      token_hash: hashSessionToken(token),
-      user_id: userId,
-      expires_at: expiresAt,
-    });
+    .delete()
+    .lt("expires_at", new Date().toISOString());
+
+  const { error } = await supabase.from("auth_sessions").insert({
+    token_hash: hashSessionToken(token),
+    user_id: userId,
+    expires_at: expiresAt,
+  });
   if (error) throw error;
 
   return { token, expiresAt };
@@ -54,12 +58,21 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   if (userError || !user) return null;
 
-  await getSupabaseAdmin()
+  return { id: user.id, displayName: user.display_name };
+}
+
+export async function touchCurrentSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return false;
+
+  const { error } = await getSupabaseAdmin()
     .from("auth_sessions")
     .update({ last_seen_at: new Date().toISOString() })
-    .eq("token_hash", hashSessionToken(token));
+    .eq("token_hash", hashSessionToken(token))
+    .gt("expires_at", new Date().toISOString());
 
-  return { id: user.id, displayName: user.display_name };
+  return !error;
 }
 
 export async function deleteCurrentSession() {
