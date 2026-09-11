@@ -22,6 +22,12 @@ alter table public.messages
 alter table public.messages
   add column if not exists read_at timestamptz;
 
+alter table public.messages
+  add column if not exists reply_to_message_id uuid references public.messages(id) on delete set null;
+
+create index if not exists messages_reply_to_message_id_idx
+  on public.messages(reply_to_message_id);
+
 alter table public.messages enable row level security;
 alter table public.app_users enable row level security;
 alter table public.auth_sessions enable row level security;

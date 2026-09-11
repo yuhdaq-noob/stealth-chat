@@ -30,6 +30,7 @@ export default function Home() {
   const [pendingMessage, setPendingMessage] = useState("");
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -156,6 +157,7 @@ export default function Home() {
       window.clearInterval(presenceTimer);
       setMessages([]);
       setSelectedMessageIds([]);
+      setReplyingTo(null);
       setIsPartnerOnline(false);
       setIsLoadingMessages(false);
     };
@@ -189,6 +191,7 @@ export default function Home() {
     event.preventDefault();
     const content = newMessage.trim();
     if (!content) return;
+    const replyToMessageId = replyingTo?.id ?? null;
     setIsSending(true);
     setPendingMessage(content);
     setChatError("");
@@ -197,7 +200,7 @@ export default function Home() {
     const response = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, replyToMessageId }),
     });
     if (response.status === 401) {
       handleSessionExpired();
@@ -209,6 +212,7 @@ export default function Home() {
       const result = await response.json();
       if (result.message)
         setMessages((current) => [...current, result.message]);
+      setReplyingTo(null);
     }
     setPendingMessage("");
     setIsSending(false);
@@ -268,6 +272,9 @@ export default function Home() {
           onRetryLoad={() => setMessageRefreshKey((key) => key + 1)}
           onSelectionChange={setSelectedMessageIds}
           onDeleteMessages={deleteMessages}
+          replyingTo={replyingTo}
+          onReply={setReplyingTo}
+          onCancelReply={() => setReplyingTo(null)}
           onExit={exitChatMode}
         />
       ) : (

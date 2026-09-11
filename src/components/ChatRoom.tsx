@@ -12,6 +12,7 @@ import {
   LogOut,
   MoreVertical,
   RefreshCw,
+  Reply,
   Send,
   Trash2,
   Wifi,
@@ -36,12 +37,15 @@ interface ChatRoomProps {
   pendingMessage: string;
   selectedMessageIds: string[];
   isDeleting: boolean;
+  replyingTo: Message | null;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   onNewMessageChange: (value: string) => void;
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
   onRetryLoad: () => void;
   onSelectionChange: (ids: string[]) => void;
   onDeleteMessages: (ids: string[]) => boolean | Promise<boolean>;
+  onReply: (message: Message) => void;
+  onCancelReply: () => void;
   onExit: () => void;
 }
 
@@ -57,12 +61,15 @@ export function ChatRoom({
   pendingMessage,
   selectedMessageIds,
   isDeleting,
+  replyingTo,
   chatBottomRef,
   onNewMessageChange,
   onSendMessage,
   onRetryLoad,
   onSelectionChange,
   onDeleteMessages,
+  onReply,
+  onCancelReply,
   onExit,
 }: ChatRoomProps) {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -127,6 +134,13 @@ export function ChatRoom({
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  const jumpToMessage = (id: string) => {
+    document.getElementById(`message-${id}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
   };
 
   return (
@@ -227,6 +241,7 @@ export function ChatRoom({
             return (
               <article
                 key={message.id}
+                id={`message-${message.id}`}
                 className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
                 onPointerDown={
                   isCurrentUser ? () => startLongPress(message.id) : undefined
@@ -277,6 +292,28 @@ export function ChatRoom({
                       <span />
                     </label>
                   )}
+                  {message.reply_to_message && (
+                    <button
+                      type="button"
+                      className="message-reply-preview"
+                      onClick={() =>
+                        jumpToMessage(message.reply_to_message!.id)
+                      }
+                    >
+                      <span>
+                        Membalas{" "}
+                        {getUserAlias(
+                          message.reply_to_message.sender_id,
+                          message.reply_to_message.sender_id === currentUserId
+                            ? currentUserName
+                            : "Partner",
+                        )}
+                      </span>
+                      <strong>
+                        {message.reply_to_message.content || "Lampiran"}
+                      </strong>
+                    </button>
+                  )}
                   <p className="message-content">{message.content}</p>
                   {message.media_url &&
                     message.media_type?.startsWith("image/") && (
@@ -301,6 +338,16 @@ export function ChatRoom({
                       </a>
                     )}
                   <div className="message-actions">
+                    <button
+                      type="button"
+                      onClick={() => onReply(message)}
+                      disabled={isSelectionMode}
+                      aria-label="Balas pesan"
+                      title="Balas pesan"
+                    >
+                      <Reply size={13} />
+                      <span>Balas</span>
+                    </button>
                     {isCurrentUser &&
                       (message.read_at ? (
                         <CheckCheck
@@ -347,6 +394,30 @@ export function ChatRoom({
           <span>{errorMessage}</span>
           <button type="button" onClick={onRetryLoad}>
             <RefreshCw size={13} /> Retry
+          </button>
+        </div>
+      )}
+      {replyingTo && (
+        <div className="reply-composer-preview">
+          <div>
+            <span>
+              Membalas{" "}
+              {getUserAlias(
+                replyingTo.sender_id,
+                replyingTo.sender_id === currentUserId
+                  ? currentUserName
+                  : "Partner",
+              )}
+            </span>
+            <strong>{replyingTo.content || "Lampiran"}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            aria-label="Batalkan reply"
+            title="Batalkan reply"
+          >
+            <X size={15} />
           </button>
         </div>
       )}

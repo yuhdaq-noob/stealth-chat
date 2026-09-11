@@ -60,7 +60,7 @@ textarea:focus-visible {
 .chat-shell {
   width: 100%;
   height: 100dvh;
-  min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   margin: 0 auto;
@@ -363,7 +363,48 @@ textarea:focus-visible {
   font-size: 14px;
   line-height: 1.55;
 }
+.message-reply-preview,
+.reply-composer-preview {
+  border-left: 3px solid #e79a70;
+  background: #17221f52;
+  text-align: left;
+}
 
+.message-reply-preview {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0 0 9px;
+  padding: 7px 9px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  color: #bfd0c7;
+  cursor: pointer;
+  font: inherit;
+}
+
+.message-reply-preview:hover {
+  background: #17221f80;
+}
+
+.message-reply-preview span,
+.reply-composer-preview span {
+  color: #e79a70;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.message-reply-preview strong,
+.reply-composer-preview strong {
+  overflow: hidden;
+  color: #d7e4de;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .message-image {
   display: block;
   max-width: 100%;
@@ -437,6 +478,49 @@ textarea:focus-visible {
 .chat-error button {
   color: #f8c8bb;
   font-weight: 700;
+}
+.reply-composer-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  margin-top: 14px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid #3b5148;
+  border-left: 3px solid #e79a70;
+  border-radius: 9px;
+  background: #22312d;
+  box-shadow: 0 6px 16px #1019161c;
+}
+
+.reply-composer-preview > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reply-composer-preview strong {
+  max-width: min(720px, 70vw);
+}
+
+.reply-composer-preview button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #b9d0c5;
+  cursor: pointer;
+}
+
+.reply-composer-preview button:hover {
+  background: #2b4038;
+  color: #fff;
 }
 
 .composer {
@@ -615,6 +699,15 @@ textarea:focus-visible {
   .composer {
     align-items: flex-end;
     gap: 6px;
+  }
+  .reply-composer-preview {
+    min-height: 52px;
+    margin-top: 10px;
+    padding: 7px 8px 7px 10px;
+  }
+
+  .reply-composer-preview strong {
+    max-width: calc(100vw - 82px);
   }
 
   .composer textarea {
