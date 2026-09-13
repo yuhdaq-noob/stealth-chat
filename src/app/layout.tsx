@@ -17,13 +17,19 @@ export const metadata: Metadata = {
   description: "Private notes and messaging.",
 };
 
+export const viewport = {
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+     <body className="h-full flex flex-col overflow-hidden">{children}</body>
     </html>
   );
 }
