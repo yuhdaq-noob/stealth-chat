@@ -234,7 +234,7 @@ export function ChatRoom({
         {isLoading ? (
           <div className="chat-empty-state">
             <RefreshCw size={18} className="animate-spin" />
-            <p>Loading room...</p>
+            <p>Sabar bos... Loading</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="chat-empty-state">
@@ -242,7 +242,7 @@ export function ChatRoom({
               <Send size={18} />
             </div>
             <p>No messages yet</p>
-            <span>Start a quiet conversation with your seller or buyer.</span>
+            <span>Dilaran memposting alat kelamin di sini, kecuali untuk admin.</span>
           </div>
         ) : (
           messages.map((message) => {
