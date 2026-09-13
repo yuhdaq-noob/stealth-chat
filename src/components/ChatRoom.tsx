@@ -43,7 +43,7 @@ interface ChatRoomProps {
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
   onRetryLoad: () => void;
   onSelectionChange: (ids: string[]) => void;
-  onDeleteMessages: (ids: string[]) => boolean | Promise<boolean>;
+  onDeleteMessages: (ids: string[]) => void;
   onReply: (message: Message) => void;
   onCancelReply: () => void;
   onExit: () => void;
@@ -76,8 +76,10 @@ export function ChatRoom({
   const chatMessagesRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const longPressTimerRef = useRef<number | null>(null);
+  const longPressOriginRef = useRef({ x: 0, y: 0 });
   const remainingCharacters = 2000 - newMessage.length;
   const currentUserAlias = getUserAlias(currentUserId, currentUserName);
+  const isSelectionActive = isSelectionMode && selectedMessageIds.length > 0;
   const ownMessageIds = messages
     .filter((message) => message.sender_id === currentUserId)
     .map((message) => message.id);
@@ -122,7 +124,9 @@ export function ChatRoom({
     if (ids.length === 0) setIsSelectionMode(false);
   };
 
-  const startLongPress = (id: string) => {
+  const startLongPress = (event: React.PointerEvent, id: string) => {
+    if (event.pointerType !== "touch") return;
+    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
     longPressTimerRef.current = window.setTimeout(() => {
       activateSelection(id);
       longPressTimerRef.current = null;
@@ -134,6 +138,14 @@ export function ChatRoom({
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  const handleLongPressMove = (event: React.PointerEvent) => {
+    const distance = Math.hypot(
+      event.clientX - longPressOriginRef.current.x,
+      event.clientY - longPressOriginRef.current.y,
+    );
+    if (distance > 10) cancelLongPress();
   };
 
   const jumpToMessage = (id: string) => {
@@ -180,10 +192,7 @@ export function ChatRoom({
                 <button
                   type="button"
                   className="selection-action selection-delete"
-                  onClick={async () => {
-                    const deleted = await onDeleteMessages(selectedMessageIds);
-                    if (deleted) setIsSelectionMode(false);
-                  }}
+                  onClick={() => onDeleteMessages(selectedMessageIds)}
                   disabled={isDeleting}
                 >
                   <Trash2 size={13} />
@@ -244,8 +253,11 @@ export function ChatRoom({
                 id={`message-${message.id}`}
                 className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
                 onPointerDown={
-                  isCurrentUser ? () => startLongPress(message.id) : undefined
+                  isCurrentUser
+                    ? (event) => startLongPress(event, message.id)
+                    : undefined
                 }
+                onPointerMove={isCurrentUser ? handleLongPressMove : undefined}
                 onPointerUp={cancelLongPress}
                 onPointerCancel={cancelLongPress}
                 onPointerLeave={cancelLongPress}
@@ -269,8 +281,10 @@ export function ChatRoom({
                     {format(new Date(message.created_at), "HH:mm")}
                   </time>
                 </div>
-                <div className="message-bubble">
-                  {isCurrentUser && !isSelectionMode && (
+                <div
+                  className={`message-bubble ${isSelectionActive ? "is-selection-mode" : ""}`}
+                >
+                  {isCurrentUser && !isSelectionActive && (
                     <button
                       type="button"
                       className="message-menu"
@@ -281,7 +295,7 @@ export function ChatRoom({
                       <MoreVertical size={15} />
                     </button>
                   )}
-                  {isCurrentUser && isSelectionMode && (
+                  {isCurrentUser && isSelectionActive && (
                     <label className="message-select">
                       <input
                         type="checkbox"
@@ -341,7 +355,7 @@ export function ChatRoom({
                     <button
                       type="button"
                       onClick={() => onReply(message)}
-                      disabled={isSelectionMode}
+                      disabled={isSelectionActive}
                       aria-label="Balas pesan"
                       title="Balas pesan"
                     >
@@ -389,78 +403,80 @@ export function ChatRoom({
         <div ref={chatBottomRef} />
       </div>
 
-      {errorMessage && (
-        <div className="chat-error" role="alert" aria-live="assertive">
-          <span>{errorMessage}</span>
-          <button type="button" onClick={onRetryLoad}>
-            <RefreshCw size={13} /> Retry
-          </button>
-        </div>
-      )}
-      {replyingTo && (
-        <div className="reply-composer-preview">
-          <div>
-            <span>
-              Membalas{" "}
-              {getUserAlias(
-                replyingTo.sender_id,
-                replyingTo.sender_id === currentUserId
-                  ? currentUserName
-                  : "Partner",
-              )}
-            </span>
-            <strong>{replyingTo.content || "Lampiran"}</strong>
+      <div className="chat-bottom-panel">
+        {errorMessage && (
+          <div className="chat-error" role="alert" aria-live="assertive">
+            <span>{errorMessage}</span>
+            <button type="button" onClick={onRetryLoad}>
+              <RefreshCw size={13} /> Retry
+            </button>
           </div>
+        )}
+        {replyingTo && (
+          <div className="reply-composer-preview">
+            <div>
+              <span>
+                Membalas{" "}
+                {getUserAlias(
+                  replyingTo.sender_id,
+                  replyingTo.sender_id === currentUserId
+                    ? currentUserName
+                    : "Partner",
+                )}
+              </span>
+              <strong>{replyingTo.content || "Lampiran"}</strong>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label="Batalkan reply"
+              title="Batalkan reply"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+        <form onSubmit={onSendMessage} className="composer">
+          <div className="composer-input">
+            <textarea
+              value={newMessage}
+              onChange={(event) => onNewMessageChange(event.target.value)}
+              placeholder="Tulis pesan..."
+              aria-label="Pesan baru"
+              aria-describedby="composer-count"
+              maxLength={2000}
+              disabled={isSending}
+              rows={1}
+            />
+            <span
+              id="composer-count"
+              className={`composer-count ${remainingCharacters < 100 ? "is-low" : ""}`}
+            >
+              {remainingCharacters}
+            </span>
+          </div>
+          <a
+            href={FILE_FORM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button button-secondary"
+            title="Open the file sharing form"
+            aria-label="Open the file sharing form"
+          >
+            <FileUp size={16} />
+            <span>File</span>
+          </a>
           <button
-            type="button"
-            onClick={onCancelReply}
-            aria-label="Batalkan reply"
-            title="Batalkan reply"
+            type="submit"
+            disabled={isSending || !newMessage.trim()}
+            className="button button-primary"
+            aria-label={isSending ? "Sending" : "Send"}
           >
-            <X size={15} />
+            <Send size={16} />
+            <span>{isSending ? "Sending" : "Send"}</span>
           </button>
-        </div>
-      )}
-      <form onSubmit={onSendMessage} className="composer">
-        <div className="composer-input">
-          <textarea
-            value={newMessage}
-            onChange={(event) => onNewMessageChange(event.target.value)}
-            placeholder="Tulis pesan..."
-            aria-label="Pesan baru"
-            aria-describedby="composer-count"
-            maxLength={2000}
-            disabled={isSending}
-            rows={1}
-          />
-          <span
-            id="composer-count"
-            className={`composer-count ${remainingCharacters < 100 ? "is-low" : ""}`}
-          >
-            {remainingCharacters}
-          </span>
-        </div>
-        <a
-          href={FILE_FORM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="button button-secondary"
-          title="Open the file sharing form"
-          aria-label="Open the file sharing form"
-        >
-          <FileUp size={16} />
-          <span>File</span>
-        </a>
-        <button
-          type="submit"
-          disabled={isSending || !newMessage.trim()}
-          className="button button-primary"
-          aria-label={isSending ? "Sending" : "Send"}
-        >
-          <Send size={16} />
-          <span>{isSending ? "Sending" : "Send"}</span>
-        </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

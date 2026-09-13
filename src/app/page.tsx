@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChatRoom } from "@/components/ChatRoom";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Notepad } from "@/components/Notepad";
 import { PasscodeModal } from "@/components/PasscodeModal";
 import type { Message } from "@/types/message";
@@ -31,8 +32,12 @@ export default function Home() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [deleteConfirmationIds, setDeleteConfirmationIds] = useState<string[]>(
+    [],
+  );
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const messageRequestVersionRef = useRef(0);
 
   const handleSessionExpired = () => {
     sessionStorage.removeItem("stealth_chat_active");
@@ -106,10 +111,12 @@ export default function Home() {
     let isActive = true;
 
     const fetchMessages = async (showLoading = false) => {
+      const requestVersion = ++messageRequestVersionRef.current;
       if (showLoading) setIsLoadingMessages(true);
       setChatError("");
       const response = await fetch("/api/messages");
-      if (!isActive) return;
+      if (!isActive || requestVersion !== messageRequestVersionRef.current)
+        return;
       if (response.status === 401) {
         handleSessionExpired();
         if (showLoading) setIsLoadingMessages(false);
@@ -153,6 +160,7 @@ export default function Home() {
 
     return () => {
       isActive = false;
+      messageRequestVersionRef.current += 1;
       window.clearInterval(messageTimer);
       window.clearInterval(presenceTimer);
       setMessages([]);
@@ -192,6 +200,7 @@ export default function Home() {
     const content = newMessage.trim();
     if (!content) return;
     const replyToMessageId = replyingTo?.id ?? null;
+    messageRequestVersionRef.current += 1;
     setIsSending(true);
     setPendingMessage(content);
     setChatError("");
@@ -220,16 +229,18 @@ export default function Home() {
 
   const deleteMessages = async (ids: string[]) => {
     if (ids.length === 0) return false;
-    const confirmed = window.confirm(
-      `Hapus ${ids.length} ${ids.length === 1 ? "pesan" : "pesan yang dipilih"}?`,
-    );
-    if (!confirmed) return false;
+    setDeleteConfirmationIds(ids);
+    return false;
+  };
+
+  const confirmDeleteMessages = async () => {
+    if (deleteConfirmationIds.length === 0) return;
     setIsDeleting(true);
     setChatError("");
     const response = await fetch("/api/messages", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ ids: deleteConfirmationIds }),
     });
     const result = await response.json().catch(() => null);
     if (response.status === 401) {
@@ -246,7 +257,7 @@ export default function Home() {
       );
     }
     setIsDeleting(false);
-    return response.ok;
+    if (response.ok) setDeleteConfirmationIds([]);
   };
 
   if (isAuthLoading) return null;
@@ -283,6 +294,14 @@ export default function Home() {
           onChange={handleNoteChange}
           isSaved={isNoteSaved}
           onUnlockRequest={() => setShowPasscodeModal(true)}
+        />
+      )}
+      {deleteConfirmationIds.length > 0 && (
+        <ConfirmDialog
+          count={deleteConfirmationIds.length}
+          isConfirming={isDeleting}
+          onCancel={() => setDeleteConfirmationIds([])}
+          onConfirm={() => void confirmDeleteMessages()}
         />
       )}
       {showPasscodeModal && (
