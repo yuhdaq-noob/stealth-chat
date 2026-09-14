@@ -237,9 +237,15 @@ textarea:focus-visible {
 .chat-messages {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   padding: 16px 2px 28px;
   scrollbar-color: #49645a transparent;
+}
+
+.chat-messages > .message-row:first-child {
+  margin-top: auto;
 }
 
 .chat-bottom-panel {
@@ -250,6 +256,7 @@ textarea:focus-visible {
 }
 
 .chat-empty-state {
+  flex: 1;
   display: grid;
   place-items: center;
   min-height: 280px;
@@ -574,10 +581,7 @@ textarea:focus-visible {
   gap: 9px;
   padding-top: 18px;
   border-top: 1px solid #31413b;
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  background: #17221f;
+  background: transparent;
 }
 
 .composer-input {
@@ -829,7 +833,8 @@ textarea:focus-visible {
 
 @media (max-width: 640px) {
   .chat-shell {
-    padding: 18px 14px max(14px, env(safe-area-inset-bottom));
+    padding: max(18px, env(safe-area-inset-top)) 14px
+      max(14px, env(safe-area-inset-bottom));
   }
 
   .chat-header {
