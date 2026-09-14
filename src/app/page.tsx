@@ -35,6 +35,7 @@ export default function Home() {
   const [deleteConfirmationIds, setDeleteConfirmationIds] = useState<string[]>(
     [],
   );
+  const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const messageRequestVersionRef = useRef(0);
@@ -229,24 +230,40 @@ export default function Home() {
 
   const deleteMessages = async (ids: string[]) => {
     if (ids.length === 0) return false;
+    setDeleteAllConfirmation(false);
     setDeleteConfirmationIds(ids);
     return false;
   };
 
+  const deleteAllMessages = () => {
+    if (messages.length === 0) return;
+    setDeleteConfirmationIds([]);
+    setDeleteAllConfirmation(true);
+  };
+
   const confirmDeleteMessages = async () => {
-    if (deleteConfirmationIds.length === 0) return;
+    if (deleteConfirmationIds.length === 0 && !deleteAllConfirmation) return;
     setIsDeleting(true);
     setChatError("");
+    messageRequestVersionRef.current += 1;
     const response = await fetch("/api/messages", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: deleteConfirmationIds }),
+      body: JSON.stringify(
+        deleteAllConfirmation
+          ? { deleteAll: true }
+          : { ids: deleteConfirmationIds },
+      ),
     });
     const result = await response.json().catch(() => null);
     if (response.status === 401) {
       handleSessionExpired();
     } else if (!response.ok) {
       setChatError(result?.error ?? "Pesan tidak dapat dihapus.");
+    } else if (deleteAllConfirmation) {
+      setMessages([]);
+      setSelectedMessageIds([]);
+      setReplyingTo(null);
     } else {
       const deletedIds = new Set<string>(result?.deletedIds ?? []);
       setMessages((current) =>
@@ -257,7 +274,10 @@ export default function Home() {
       );
     }
     setIsDeleting(false);
-    if (response.ok) setDeleteConfirmationIds([]);
+    if (response.ok) {
+      setDeleteConfirmationIds([]);
+      setDeleteAllConfirmation(false);
+    }
   };
 
   if (isAuthLoading) return null;
@@ -283,6 +303,7 @@ export default function Home() {
           onRetryLoad={() => setMessageRefreshKey((key) => key + 1)}
           onSelectionChange={setSelectedMessageIds}
           onDeleteMessages={deleteMessages}
+          onDeleteAllMessages={deleteAllMessages}
           replyingTo={replyingTo}
           onReply={setReplyingTo}
           onCancelReply={() => setReplyingTo(null)}
@@ -296,11 +317,15 @@ export default function Home() {
           onUnlockRequest={() => setShowPasscodeModal(true)}
         />
       )}
-      {deleteConfirmationIds.length > 0 && (
+      {(deleteConfirmationIds.length > 0 || deleteAllConfirmation) && (
         <ConfirmDialog
           count={deleteConfirmationIds.length}
+          deleteAll={deleteAllConfirmation}
           isConfirming={isDeleting}
-          onCancel={() => setDeleteConfirmationIds([])}
+          onCancel={() => {
+            setDeleteConfirmationIds([]);
+            setDeleteAllConfirmation(false);
+          }}
           onConfirm={() => void confirmDeleteMessages()}
         />
       )}

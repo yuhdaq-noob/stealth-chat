@@ -10,7 +10,6 @@ import {
   FileUp,
   ListChecks,
   LogOut,
-  MoreVertical,
   RefreshCw,
   Reply,
   Send,
@@ -44,6 +43,7 @@ interface ChatRoomProps {
   onRetryLoad: () => void;
   onSelectionChange: (ids: string[]) => void;
   onDeleteMessages: (ids: string[]) => void;
+  onDeleteAllMessages: () => void;
   onReply: (message: Message) => void;
   onCancelReply: () => void;
   onExit: () => void;
@@ -68,12 +68,14 @@ export function ChatRoom({
   onRetryLoad,
   onSelectionChange,
   onDeleteMessages,
+  onDeleteAllMessages,
   onReply,
   onCancelReply,
   onExit,
 }: ChatRoomProps) {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressOriginRef = useRef({ x: 0, y: 0 });
@@ -103,6 +105,13 @@ export function ChatRoom({
     if (!shouldAutoScrollRef.current) return;
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingMessage, chatBottomRef]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [newMessage]);
 
   const handleMessagesScroll = () => {
     const container = chatMessagesRef.current;
@@ -168,15 +177,27 @@ export function ChatRoom({
             </p>
           </div>
         </div>
-        <button
-          onClick={onExit}
-          className="button button-quiet button-danger"
-          type="button"
-          aria-label="Exit chat"
-        >
-          <LogOut size={15} />
-          <span>Exit</span>
-        </button>
+        <div className="chat-header-actions">
+          <button
+            onClick={onDeleteAllMessages}
+            className="selection-action selection-delete header-delete-all"
+            type="button"
+            disabled={isDeleting || messages.length === 0}
+            title="Hapus semua chat"
+          >
+            <Trash2 size={14} />
+            <span>Hapus semua</span>
+          </button>
+          <button
+            onClick={onExit}
+            className="button button-quiet button-danger"
+            type="button"
+            aria-label="Exit chat"
+          >
+            <LogOut size={15} />
+            <span>Exit</span>
+          </button>
+        </div>
       </header>
 
       <div className="chat-statusbar" aria-live="polite">
@@ -242,7 +263,9 @@ export function ChatRoom({
               <Send size={18} />
             </div>
             <p>No messages yet</p>
-            <span>Dilaran memposting alat kelamin di sini, kecuali untuk admin.</span>
+            <span>
+              Dilaran memposting alat kelamin di sini, kecuali untuk admin.
+            </span>
           </div>
         ) : (
           messages.map((message) => {
@@ -287,12 +310,13 @@ export function ChatRoom({
                   {isCurrentUser && !isSelectionActive && (
                     <button
                       type="button"
-                      className="message-menu"
-                      onClick={() => activateSelection(message.id)}
-                      aria-label="Pilih pesan"
-                      title="Pilih pesan"
+                      className="message-delete"
+                      onClick={() => onDeleteMessages([message.id])}
+                      aria-label="Hapus pesan"
+                      title="Hapus pesan"
+                      disabled={isDeleting}
                     >
-                      <MoreVertical size={15} />
+                      <Trash2 size={15} />
                     </button>
                   )}
                   {isCurrentUser && isSelectionActive && (
@@ -439,6 +463,7 @@ export function ChatRoom({
         <form onSubmit={onSendMessage} className="composer">
           <div className="composer-input">
             <textarea
+              ref={textareaRef}
               value={newMessage}
               onChange={(event) => onNewMessageChange(event.target.value)}
               placeholder="Tulis pesan..."

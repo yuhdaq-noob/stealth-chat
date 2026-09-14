@@ -5,6 +5,7 @@ import { AlertTriangle, Trash2, X } from "lucide-react";
 
 interface ConfirmDialogProps {
   count: number;
+  deleteAll?: boolean;
   isConfirming: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -12,12 +13,17 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   count,
+  deleteAll = false,
   isConfirming,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const itemLabel = count === 1 ? "pesan ini" : `${count} pesan yang dipilih`;
+  const itemLabel = deleteAll
+    ? "seluruh chat, termasuk pesan partner"
+    : count === 1
+      ? "pesan ini"
+      : `${count} pesan yang dipilih`;
 
   useEffect(() => {
     cancelButtonRef.current?.focus();
@@ -57,7 +63,9 @@ export function ConfirmDialog({
           <X size={17} />
         </button>
         <div className="confirm-copy">
-          <h2 id="delete-confirmation-title">Hapus pesan?</h2>
+          <h2 id="delete-confirmation-title">
+            {deleteAll ? "Hapus semua chat?" : "Hapus pesan?"}
+          </h2>
           <p id="delete-confirmation-description">
             {`Anda akan menghapus ${itemLabel}. Tindakan ini tidak dapat dibatalkan.`}
           </p>
@@ -79,7 +87,11 @@ export function ConfirmDialog({
             disabled={isConfirming}
           >
             <Trash2 size={15} />
-            {isConfirming ? "Menghapus..." : "Hapus pesan"}
+            {isConfirming
+              ? "Menghapus..."
+              : deleteAll
+                ? "Hapus semua chat"
+                : "Hapus pesan"}
           </button>
         </div>
       </section>

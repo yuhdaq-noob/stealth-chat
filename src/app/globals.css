@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html,
+body {
+  height: 100%;
+}
+
 :root {
   --background: #eef1ef;
   --foreground: #17221f;
@@ -89,6 +94,25 @@ textarea:focus-visible {
   gap: 20px;
   padding: 0 0 22px;
   border-bottom: 1px solid #31413b;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.header-delete-all {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid #75483e;
+  border-radius: 7px;
+  color: #f0ae99;
+}
+
+.header-delete-all:hover:not(:disabled) {
+  background: #7b493c40;
 }
 
 .chat-identity {
@@ -220,13 +244,9 @@ textarea:focus-visible {
 
 .chat-bottom-panel {
   display: flex;
-  min-height: 0;
-  max-height: min(34vh, 240px);
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
-  scrollbar-color: #49645a transparent;
 }
 
 .chat-empty-state {
@@ -297,7 +317,7 @@ textarea:focus-visible {
   box-shadow: 0 8px 18px #10191628;
 }
 
-.message-menu {
+.message-delete {
   position: absolute;
   top: 7px;
   right: 7px;
@@ -313,20 +333,27 @@ textarea:focus-visible {
   opacity: 0.45;
   transition:
     opacity 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    color 0.18s ease;
 }
 
-.message-menu:focus-visible {
+.message-delete:focus-visible {
   opacity: 1;
 }
 
-.message-bubble:hover .message-menu,
-.message-menu:focus-visible {
+.message-bubble:hover .message-delete,
+.message-delete:focus-visible {
   opacity: 1;
 }
 
-.message-menu:hover {
+.message-delete:hover:not(:disabled) {
   background: #17221f30;
+  color: #ffb29b;
+}
+
+.message-delete:disabled {
+  cursor: wait;
+  opacity: 0.35;
 }
 
 .is-mine .message-content {
@@ -565,6 +592,7 @@ textarea:focus-visible {
   width: 100%;
   min-height: 42px;
   max-height: 120px;
+  overflow-y: auto;
   resize: none;
   padding: 12px 48px 12px 14px;
   border: 1px solid #3b5148;
@@ -572,6 +600,32 @@ textarea:focus-visible {
   background: #22312d;
   color: #f7faf8;
   font-size: 13px;
+  scrollbar-color: #49645a transparent;
+  scrollbar-width: thin;
+}
+
+.composer textarea::-webkit-scrollbar {
+  width: 7px;
+}
+
+.composer textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.composer textarea::-webkit-scrollbar-thumb {
+  border: 2px solid #22312d;
+  border-radius: 999px;
+  background: #49645a;
+}
+
+.composer textarea::-webkit-scrollbar-thumb:hover {
+  background: #668276;
+}
+
+.composer textarea::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .composer textarea::placeholder {
@@ -782,6 +836,14 @@ textarea:focus-visible {
     padding-bottom: 16px;
   }
 
+  .chat-header-actions {
+    gap: 7px;
+  }
+
+  .header-delete-all {
+    padding: 0 7px;
+  }
+
   .chat-statusbar {
     min-height: 44px;
     padding-top: 11px;
@@ -808,12 +870,8 @@ textarea:focus-visible {
     max-width: 88%;
   }
 
-  .message-menu {
+  .message-delete {
     opacity: 0.7;
-  }
-
-  .chat-bottom-panel {
-    max-height: min(38vh, 220px);
   }
 
   .composer {

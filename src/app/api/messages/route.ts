@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { triggerTelegramNotification } from "@/lib/telegram";
 
 const MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -139,6 +140,11 @@ export async function POST(request: Request) {
       { error: "Pesan tidak dapat dikirim." },
       { status: 500 },
     );
+
+  if (user.id === process.env.TELEGRAM_TRIGGER_USER_ID) {
+    triggerTelegramNotification();
+  }
+
   try {
     const [message] = await addReplyPreviews([data]);
     return Response.json({ message }, { status: 201 });
@@ -154,7 +160,27 @@ export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const ids = getMessageIds(await request.json().catch(() => null));
+  const body = await request.json().catch(() => null);
+  const deleteAll =
+    body && typeof body === "object" && "deleteAll" in body
+      ? (body as { deleteAll?: unknown }).deleteAll === true
+      : false;
+
+  if (deleteAll) {
+    const { error } = await getSupabaseAdmin()
+      .from("messages")
+      .delete()
+      .not("id", "is", null);
+
+    if (error)
+      return Response.json(
+        { error: "Semua pesan tidak dapat dihapus." },
+        { status: 500 },
+      );
+    return Response.json({ deletedAll: true });
+  }
+
+  const ids = getMessageIds(body);
   if (ids.length === 0)
     return Response.json(
       { error: "Pilih pesan yang akan dihapus." },
