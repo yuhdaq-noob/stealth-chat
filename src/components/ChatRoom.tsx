@@ -37,7 +37,6 @@ interface ChatRoomProps {
   selectedMessageIds: string[];
   isDeleting: boolean;
   replyingTo: Message | null;
-  chatBottomRef: React.RefObject<HTMLDivElement | null>;
   onNewMessageChange: (value: string) => void;
   onSendMessage: (event: React.FormEvent<HTMLFormElement>) => void;
   onRetryLoad: () => void;
@@ -62,7 +61,6 @@ export function ChatRoom({
   selectedMessageIds,
   isDeleting,
   replyingTo,
-  chatBottomRef,
   onNewMessageChange,
   onSendMessage,
   onRetryLoad,
@@ -103,8 +101,13 @@ export function ChatRoom({
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, pendingMessage, chatBottomRef]);
+    const container = chatMessagesRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, pendingMessage]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -158,9 +161,13 @@ export function ChatRoom({
   };
 
   const jumpToMessage = (id: string) => {
-    document.getElementById(`message-${id}`)?.scrollIntoView({
+    const container = chatMessagesRef.current;
+    const message = document.getElementById(`message-${id}`);
+    if (!container || !message) return;
+    container.scrollTo({
+      top:
+        message.offsetTop - (container.clientHeight - message.offsetHeight) / 2,
       behavior: "smooth",
-      block: "center",
     });
   };
 
@@ -424,7 +431,6 @@ export function ChatRoom({
             </div>
           </article>
         )}
-        <div ref={chatBottomRef} />
       </div>
 
       <div className="chat-bottom-panel">

@@ -37,7 +37,6 @@ export default function Home() {
   );
   const [deleteAllConfirmation, setDeleteAllConfirmation] = useState(false);
   const [messageRefreshKey, setMessageRefreshKey] = useState(0);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
   const messageRequestVersionRef = useRef(0);
 
   const handleSessionExpired = () => {
@@ -283,7 +282,7 @@ export default function Home() {
   if (isAuthLoading) return null;
 
   return (
-    <main className="min-h-screen text-neutral-100">
+    <main className="chat-page text-neutral-100">
       {isChatMode ? (
         <ChatRoom
           currentUserId={currentUserId}
@@ -297,7 +296,6 @@ export default function Home() {
           pendingMessage={pendingMessage}
           selectedMessageIds={selectedMessageIds}
           isDeleting={isDeleting}
-          chatBottomRef={chatBottomRef}
           onNewMessageChange={setNewMessage}
           onSendMessage={sendMessage}
           onRetryLoad={() => setMessageRefreshKey((key) => key + 1)}
