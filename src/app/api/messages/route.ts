@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     );
 
   if (user.id === process.env.TELEGRAM_TRIGGER_USER_ID) {
-    triggerTelegramNotification();
+    await triggerTelegramNotification();
   }
 
   try {
