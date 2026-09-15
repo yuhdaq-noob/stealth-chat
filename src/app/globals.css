@@ -706,6 +706,9 @@ textarea:focus-visible {
 }
 
 .notepad-shell {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
   min-height: 100dvh;
   background:
     radial-gradient(circle at 80% 0, #d9ece2 0, transparent 27%), #eef1ef;
