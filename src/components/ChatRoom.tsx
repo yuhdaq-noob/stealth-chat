@@ -193,7 +193,7 @@ export function ChatRoom({
             title="Hapus semua chat"
           >
             <Trash2 size={14} />
-            <span>Hapus semua</span>
+            <span>Hapus semua pesan</span>
           </button>
           <button
             onClick={onExit}
@@ -271,7 +271,7 @@ export function ChatRoom({
             </div>
             <p>No messages yet</p>
             <span>
-              Dilaran memposting alat kelamin di sini, kecuali untuk admin.
+              Dilarang memposting alat kelamin di sini, kecuali untuk admin.
             </span>
           </div>
         ) : (

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { getCurrentUser } from "@/lib/server-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { triggerTelegramNotification } from "@/lib/telegram";
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
     );
 
   if (user.id === process.env.TELEGRAM_TRIGGER_USER_ID) {
-    await triggerTelegramNotification();
+    after(() => triggerTelegramNotification());
   }
 
   try {
