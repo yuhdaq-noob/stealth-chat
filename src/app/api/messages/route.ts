@@ -1,7 +1,5 @@
-import { after } from "next/server";
 import { getCurrentUser } from "@/lib/server-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { triggerTelegramNotification } from "@/lib/telegram";
 
 const MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -141,10 +139,6 @@ export async function POST(request: Request) {
       { error: "Pesan tidak dapat dikirim." },
       { status: 500 },
     );
-
-  if (user.id === process.env.TELEGRAM_TRIGGER_USER_ID) {
-    after(() => triggerTelegramNotification());
-  }
 
   try {
     const [message] = await addReplyPreviews([data]);
