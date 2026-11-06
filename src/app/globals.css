@@ -299,6 +299,17 @@ textarea:focus-visible {
   box-shadow: 0 0 0 2px #e8c27e44;
 }
 
+.date-separator {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 12px;
+  color: #91a39a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .message-meta {
   display: flex;
   gap: 8px;

@@ -1,8 +1,8 @@
 "use client";
 
-import { format } from "date-fns";
+import { isSameDay, isToday, isYesterday, format } from "date-fns";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -23,6 +23,16 @@ import type { Message } from "@/types/message";
 
 const FILE_FORM_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSca0T6Q4sseRNY68H2GvbxR0epODNaSLej71iC4cQwPrsczrw/viewform?usp=dialog";
+
+function getDateLabel(date: Date) {
+  if (isToday(date)) return "Hari ini";
+  if (isYesterday(date)) return "Kemarin";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
 
 interface ChatRoomProps {
   currentUserId: string;
@@ -275,141 +285,155 @@ export function ChatRoom({
             </span>
           </div>
         ) : (
-          messages.map((message) => {
+          messages.map((message, index) => {
             const isCurrentUser = message.sender_id === currentUserId;
+            const messageDate = new Date(message.created_at);
+            const previousMessage = messages[index - 1];
+            const shouldShowDate =
+              !previousMessage ||
+              !isSameDay(messageDate, new Date(previousMessage.created_at));
+
             return (
-              <article
-                key={message.id}
-                id={`message-${message.id}`}
-                className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
-                onPointerDown={
-                  isCurrentUser
-                    ? (event) => startLongPress(event, message.id)
-                    : undefined
-                }
-                onPointerMove={isCurrentUser ? handleLongPressMove : undefined}
-                onPointerUp={cancelLongPress}
-                onPointerCancel={cancelLongPress}
-                onPointerLeave={cancelLongPress}
-                onContextMenu={
-                  isCurrentUser
-                    ? (event) => {
-                        event.preventDefault();
-                        activateSelection(message.id);
-                      }
-                    : undefined
-                }
-              >
-                <div className="message-meta">
-                  <span>
-                    {getUserAlias(
-                      message.sender_id,
-                      isCurrentUser ? currentUserName : "Partner",
-                    )}
-                  </span>
-                  <time dateTime={message.created_at}>
-                    {format(new Date(message.created_at), "HH:mm")}
-                  </time>
-                </div>
-                <div
-                  className={`message-bubble ${isSelectionActive ? "is-selection-mode" : ""}`}
-                >
-                  {isCurrentUser && !isSelectionActive && (
-                    <button
-                      type="button"
-                      className="message-delete"
-                      onClick={() => onDeleteMessages([message.id])}
-                      aria-label="Hapus pesan"
-                      title="Hapus pesan"
-                      disabled={isDeleting}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                  {isCurrentUser && isSelectionActive && (
-                    <label className="message-select">
-                      <input
-                        type="checkbox"
-                        checked={selectedMessageIds.includes(message.id)}
-                        onChange={() => toggleMessageSelection(message.id)}
-                        aria-label="Pilih pesan"
-                      />
-                      <span />
-                    </label>
-                  )}
-                  {message.reply_to_message && (
-                    <button
-                      type="button"
-                      className="message-reply-preview"
-                      onClick={() =>
-                        jumpToMessage(message.reply_to_message!.id)
-                      }
-                    >
-                      <span>
-                        Membalas{" "}
-                        {getUserAlias(
-                          message.reply_to_message.sender_id,
-                          message.reply_to_message.sender_id === currentUserId
-                            ? currentUserName
-                            : "Partner",
-                        )}
-                      </span>
-                      <strong>
-                        {message.reply_to_message.content || "Lampiran"}
-                      </strong>
-                    </button>
-                  )}
-                  <p className="message-content">{message.content}</p>
-                  {message.media_url &&
-                    message.media_type?.startsWith("image/") && (
-                      <Image
-                        src={message.media_url}
-                        alt="Lampiran pesan"
-                        width={640}
-                        height={480}
-                        unoptimized
-                        className="message-image"
-                      />
-                    )}
-                  {message.media_url &&
-                    !message.media_type?.startsWith("image/") && (
-                      <a
-                        href={message.media_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="message-attachment"
-                      >
-                        Buka lampiran
-                      </a>
-                    )}
-                  <div className="message-actions">
-                    <button
-                      type="button"
-                      onClick={() => onReply(message)}
-                      disabled={isSelectionActive}
-                      aria-label="Balas pesan"
-                      title="Balas pesan"
-                    >
-                      <Reply size={13} />
-                      <span>Balas</span>
-                    </button>
-                    {isCurrentUser &&
-                      (message.read_at ? (
-                        <CheckCheck
-                          size={15}
-                          className="message-status is-read"
-                          aria-label="Sudah terbaca"
-                        />
-                      ) : (
-                        <Check
-                          size={15}
-                          className="message-status"
-                          aria-label="Terkirim"
-                        />
-                      ))}
+              <Fragment key={message.id}>
+                {shouldShowDate && (
+                  <div className="date-separator">
+                    {getDateLabel(messageDate)}
                   </div>
-                </div>
-              </article>
+                )}
+                <article
+                  id={`message-${message.id}`}
+                  className={`message-row ${isCurrentUser ? "is-mine" : ""} ${selectedMessageIds.includes(message.id) ? "is-selected" : ""}`}
+                  onPointerDown={
+                    isCurrentUser
+                      ? (event) => startLongPress(event, message.id)
+                      : undefined
+                  }
+                  onPointerMove={
+                    isCurrentUser ? handleLongPressMove : undefined
+                  }
+                  onPointerUp={cancelLongPress}
+                  onPointerCancel={cancelLongPress}
+                  onPointerLeave={cancelLongPress}
+                  onContextMenu={
+                    isCurrentUser
+                      ? (event) => {
+                          event.preventDefault();
+                          activateSelection(message.id);
+                        }
+                      : undefined
+                  }
+                >
+                  <div className="message-meta">
+                    <span>
+                      {getUserAlias(
+                        message.sender_id,
+                        isCurrentUser ? currentUserName : "Partner",
+                      )}
+                    </span>
+                    <time dateTime={message.created_at}>
+                      {format(new Date(message.created_at), "HH:mm")}
+                    </time>
+                  </div>
+                  <div
+                    className={`message-bubble ${isSelectionActive ? "is-selection-mode" : ""}`}
+                  >
+                    {isCurrentUser && !isSelectionActive && (
+                      <button
+                        type="button"
+                        className="message-delete"
+                        onClick={() => onDeleteMessages([message.id])}
+                        aria-label="Hapus pesan"
+                        title="Hapus pesan"
+                        disabled={isDeleting}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                    {isCurrentUser && isSelectionActive && (
+                      <label className="message-select">
+                        <input
+                          type="checkbox"
+                          checked={selectedMessageIds.includes(message.id)}
+                          onChange={() => toggleMessageSelection(message.id)}
+                          aria-label="Pilih pesan"
+                        />
+                        <span />
+                      </label>
+                    )}
+                    {message.reply_to_message && (
+                      <button
+                        type="button"
+                        className="message-reply-preview"
+                        onClick={() =>
+                          jumpToMessage(message.reply_to_message!.id)
+                        }
+                      >
+                        <span>
+                          Membalas{" "}
+                          {getUserAlias(
+                            message.reply_to_message.sender_id,
+                            message.reply_to_message.sender_id === currentUserId
+                              ? currentUserName
+                              : "Partner",
+                          )}
+                        </span>
+                        <strong>
+                          {message.reply_to_message.content || "Lampiran"}
+                        </strong>
+                      </button>
+                    )}
+                    <p className="message-content">{message.content}</p>
+                    {message.media_url &&
+                      message.media_type?.startsWith("image/") && (
+                        <Image
+                          src={message.media_url}
+                          alt="Lampiran pesan"
+                          width={640}
+                          height={480}
+                          unoptimized
+                          className="message-image"
+                        />
+                      )}
+                    {message.media_url &&
+                      !message.media_type?.startsWith("image/") && (
+                        <a
+                          href={message.media_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="message-attachment"
+                        >
+                          Buka lampiran
+                        </a>
+                      )}
+                    <div className="message-actions">
+                      <button
+                        type="button"
+                        onClick={() => onReply(message)}
+                        disabled={isSelectionActive}
+                        aria-label="Balas pesan"
+                        title="Balas pesan"
+                      >
+                        <Reply size={13} />
+                        <span>Balas</span>
+                      </button>
+                      {isCurrentUser &&
+                        (message.read_at ? (
+                          <CheckCheck
+                            size={15}
+                            className="message-status is-read"
+                            aria-label="Sudah terbaca"
+                          />
+                        ) : (
+                          <Check
+                            size={15}
+                            className="message-status"
+                            aria-label="Terkirim"
+                          />
+                        ))}
+                    </div>
+                  </div>
+                </article>
+              </Fragment>
             );
           })
         )}
